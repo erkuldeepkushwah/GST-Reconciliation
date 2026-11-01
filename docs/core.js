@@ -12,9 +12,9 @@
   var VALUE_FIELDS = ["Taxable Value", "IGST", "CGST", "SGST", "Cess", "Total Tax"];
 
   var ALIASES = {
-    "Party Name": ["party name", "supplier name", "customer name", "vendor name", "trade name", "legal name", "name of supplier", "name of recipient"],
+    "Party Name": ["party name", "supplier name", "customer name", "vendor name", "trade name", "legal name", "name of supplier", "name of recipient", "receiver name", "recipient name", "buyer name", "party"],
     "Invoice Type": ["invoice type", "document type", "doc type", "voucher type", "supply type", "type of invoice"],
-    "GSTIN": ["gstin", "gstin of supplier", "supplier gstin", "gstin of recipient", "recipient gstin", "ctin", "customer gstin", "party gstin", "gst number"],
+    "GSTIN": ["gstin", "gstin of supplier", "supplier gstin", "gstin of recipient", "recipient gstin", "ctin", "customer gstin", "party gstin", "gst number", "gstin uin of recipient", "gstin uin of supplier"],
     "Invoice No": ["invoice no", "invoice number", "inum", "bill no", "bill number", "document number", "doc no", "voucher no", "voucher number", "inv no", "invoice"],
     "Invoice Date": ["invoice date", "date", "idt", "bill date", "document date", "voucher date"],
     "Taxable Value": ["taxable value", "taxable amount", "taxable", "assessable value", "taxable amt"],
@@ -71,7 +71,7 @@
   function toNumber(value) {
     if (value === null || value === undefined) return 0;
     if (typeof value === "number") return isFinite(value) ? value : 0;
-    var s = String(value).replace(/,/g, "").replace(/₹/g, "").replace(/\u00a0/g, " ").trim();
+    var s = String(value).replace(/,/g, "").replace(/\u20b9/g, "").replace(/\u00a0/g, " ").trim();
     if (BLANKS.indexOf(s.toLowerCase()) !== -1) return 0;
     var neg = /^\(.*\)$/.test(s);
     if (neg) s = s.slice(1, -1);

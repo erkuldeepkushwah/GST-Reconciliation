@@ -222,11 +222,50 @@
     return p[2] + "-" + p[1] + "-" + p[0];
   }
 
+  var MONTH_LABELS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+  function periodLabel() {
+    var mode = $("periodMode").value, p = currentPeriod(), fy = $("fy").value;
+    if (mode === "Month-wise") {
+      return MONTH_LABELS[parseInt(p.start.slice(5, 7), 10) - 1] + " " + p.start.slice(0, 4);
+    }
+    if (mode === "Quarter-wise") return "FY " + fy + " · " + (($("quarterSel") || {}).value || "Q1");
+    if (mode === "Financial Year") return "FY " + fy;
+    return fmtD(p.start).slice(0, 5) + " – " + fmtD(p.end).slice(0, 5);
+  }
+
+  function updateSetupChip() {
+    var gstin = ($("gstin").value || "").trim().toUpperCase();
+    var g = $("setupGstin"), per = $("setupPeriod");
+    if (g) g.textContent = gstin.length ? gstin : "Add GSTIN";
+    if (per) per.textContent = periodLabel();
+  }
+
   function updatePeriodCaption() {
     var p = currentPeriod();
     $("periodCaption").textContent = "Selected dates: " + fmtD(p.start) + " to " + fmtD(p.end) + "  ·  import period " + p.importPeriod;
     var hint = $("importHint");
     if (hint) hint.textContent = "Rows will be tagged with period " + p.importPeriod + ".";
+    updateSetupChip();
+  }
+
+  /* ---- mobile setup sheet ---- */
+  function openSheet() {
+    var bar = $("sidebar"), scrim = $("scrim");
+    bar.classList.add("open");
+    scrim.hidden = false;
+    requestAnimationFrame(function () { scrim.classList.add("show"); });
+    document.body.classList.add("no-scroll");
+    $("setupBtn").setAttribute("aria-expanded", "true");
+  }
+
+  function closeSheet() {
+    var bar = $("sidebar"), scrim = $("scrim");
+    bar.classList.remove("open");
+    scrim.classList.remove("show");
+    document.body.classList.remove("no-scroll");
+    $("setupBtn").setAttribute("aria-expanded", "false");
+    setTimeout(function () { if (!bar.classList.contains("open")) scrim.hidden = true; }, 230);
   }
 
   /* ------------------------------------------------------------------ *
@@ -235,10 +274,13 @@
   function showPanel(name) {
     Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (t) {
       t.classList.toggle("active", t.dataset.panel === name);
+      t.setAttribute("aria-selected", t.dataset.panel === name ? "true" : "false");
     });
     Array.prototype.forEach.call(document.querySelectorAll(".panel"), function (p) {
       p.classList.toggle("active", p.id === "panel-" + name);
     });
+    closeSheet();
+    window.scrollTo({ top: 0, behavior: "smooth" });
     if (name === "history") renderHistory();
   }
 
@@ -566,6 +608,15 @@
       $(id).addEventListener("change", renderPeriodExtra);
     });
     $("periodExtra").addEventListener("change", updatePeriodCaption);
+
+    $("setupBtn").addEventListener("click", function () {
+      if ($("sidebar").classList.contains("open")) closeSheet(); else openSheet();
+    });
+    $("closeSheet").addEventListener("click", closeSheet);
+    $("scrim").addEventListener("click", closeSheet);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeSheet();
+    });
 
     $("fileInput").addEventListener("change", function (e) {
       handleFile(e.target.files && e.target.files[0]);

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GST Reconciliation System</title>
+<meta name="description" content="Browser-based GST reconciliation: import GSTR-2A / 2B / 1 and Tally registers, match invoices, review exceptions and export reports. Data stays on your device.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">GR</span>
+    <span class="brand-text">GST Reconciliation System<small>v2 &middot; browser edition</small></span>
+  </div>
+  <div class="topbar-note">
+    <span class="dot"></span> Runs entirely in this browser &mdash; no data is uploaded anywhere
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="side-block">
+      <h2>Company &amp; period</h2>
+
+      <label class="field">
+        <span>Your GSTIN (15 characters)</span>
+        <input id="gstin" type="text" maxlength="15" placeholder="23AAAAA0000A1Z5" autocomplete="off" spellcheck="false">
+      </label>
+
+      <label class="field">
+        <span>Reporting period</span>
+        <select id="periodMode">
+          <option>Month-wise</option>
+          <option>Quarter-wise</option>
+          <option>Financial Year</option>
+          <option>Custom Date Range</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Financial Year</span>
+        <select id="fy">
+          <option>2025-26</option>
+          <option selected>2026-27</option>
+          <option>2027-28</option>
+        </select>
+      </label>
+
+      <div id="periodExtra"></div>
+
+      <div class="side-caption" id="periodCaption">Selected dates: &mdash;</div>
+      <div class="side-caption muted">Import period is MMYYYY. For quarterly or FY reports, import each tax month separately.</div>
+    </div>
+
+    <div class="side-block storage-block">
+      <h2>Local storage</h2>
+      <div class="side-caption" id="storageInfo">Checking&hellip;</div>
+      <button id="clearData" class="btn ghost small" type="button">Clear all local data</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-panel="import" type="button">Import files</button>
+      <button class="tab" data-panel="reco" type="button">Invoice reconciliation</button>
+      <button class="tab" data-panel="summary" type="button">GSTR-3B summary</button>
+      <button class="tab" data-panel="history" type="button">Import history</button>
+      <button class="tab" data-panel="help" type="button">Instructions</button>
+    </nav>
+
+    <!-- IMPORT -->
+    <section class="panel active" id="panel-import">
+      <h1>Import a return file or Tally export</h1>
+      <p class="lede">Upload a file downloaded from the GST portal, or a Tally purchase / sales register. Choose the file type accurately &mdash; it decides how the rows are used later.</p>
+
+      <div class="card">
+        <div class="grid-2">
+          <label class="field">
+            <span>File type / source</span>
+            <select id="returnType">
+              <option>GSTR-2A</option>
+              <option selected>GSTR-2B</option>
+              <option>GSTR-1</option>
+              <option>Books - Purchase Register</option>
+              <option>Books - Sales Register</option>
+              <option>GSTR-3B</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Choose .xlsx, .xlsm or .csv file</span>
+            <input id="fileInput" type="file" accept=".xlsx,.xlsm,.csv">
+          </label>
+        </div>
+        <div id="fileInfo" class="hint"></div>
+      </div>
+
+      <div class="card hidden" id="previewCard">
+        <div class="card-head">
+          <h2>Preview</h2>
+          <span class="badge" id="previewBadge"></span>
+        </div>
+        <div class="table-wrap" id="previewTable"></div>
+      </div>
+
+      <div class="card hidden" id="mappingCard">
+        <div class="card-head">
+          <h2>Map your columns</h2>
+          <button class="btn ghost small" id="resetMapping" type="button">Reset to auto-detected</button>
+        </div>
+        <p class="hint">Common headings are detected automatically. Check every selection before importing &mdash; portal and Tally export layouts differ.</p>
+        <div class="map-grid" id="mapGrid"></div>
+        <div class="notice warn hidden" id="threeBWarn">GSTR-3B is a summary return, not an invoice-level file. Rows can be stored, but invoice matching is not appropriate &mdash; use the GSTR-3B summary tab to compare totals.</div>
+        <div class="actions">
+          <button class="btn primary" id="importBtn" type="button">Import into local database</button>
+          <span class="hint" id="importHint"></span>
+        </div>
+        <div id="importMsg"></div>
+      </div>
+    </section>
+
+    <!-- RECONCILIATION -->
+    <section class="panel" id="panel-reco">
+      <h1>Invoice-level reconciliation</h1>
+      <p class="lede">Compare GSTR-2A or GSTR-2B with the Tally purchase register, or GSTR-1 with the Tally sales register. Rows are matched on invoice number + party GSTIN, and amounts are summed for duplicate invoice lines.</p>
+
+      <div class="card">
+        <div class="grid-3">
+          <label class="field">
+            <span>Reconciliation</span>
+            <select id="recoChoice">
+              <option>GSTR-2A vs Books Purchase</option>
+              <option selected>GSTR-2B vs Books Purchase</option>
+              <option>GSTR-1 vs Books Sales</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Amount tolerance (₹)</span>
+            <input id="tolerance" type="number" min="0" max="100" step="0.5" value="1">
+          </label>
+          <div class="field field-action">
+            <span>&nbsp;</span>
+            <button class="btn primary" id="runReco" type="button">Run reconciliation</button>
+          </div>
+        </div>
+        <div id="recoMsg" class="hint"></div>
+      </div>
+
+      <div class="hidden" id="recoResults">
+        <div class="metrics" id="recoMetrics"></div>
+        <div class="card">
+          <div class="card-head">
+            <h2>Reconciliation result</h2>
+            <div class="head-actions">
+              <span class="badge" id="recoBadge"></span>
+              <button class="btn ghost small" id="downloadReco" type="button">Download .xlsx</button>
+            </div>
+          </div>
+          <div class="table-wrap tall" id="recoTable"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3B SUMMARY -->
+    <section class="panel" id="panel-summary">
+      <h1>GSTR-3B summary reconciliation</h1>
+      <p class="lede">GSTR-3B is a return-level summary. Enter the figures from the relevant GSTR-3B table and from your books; the difference column updates as you type. Nothing is submitted to the GST portal.</p>
+
+      <div class="card">
+        <div class="table-wrap" id="summaryTable"></div>
+        <div class="actions">
+          <button class="btn ghost" id="downloadSummary" type="button">Download GSTR-3B comparison (.xlsx)</button>
+          <span class="hint">Values stay in this browser only.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="panel" id="panel-history">
+      <h1>Local import history</h1>
+      <p class="lede">Every import for the GSTIN in the sidebar, newest first. Data lives in this browser&rsquo;s IndexedDB storage on this device.</p>
+      <div class="card">
+        <div class="card-head">
+          <h2>Imports</h2>
+          <button class="btn ghost small" id="refreshHistory" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap" id="historyTable"><div class="empty">Enter your GSTIN in the sidebar to see import history.</div></div>
+      </div>
+    </section>
+
+    <!-- HELP -->
+    <section class="panel" id="panel-help">
+      <h1>How to use this version</h1>
+      <div class="card prose">
+        <ol>
+          <li>Export the Tally purchase register and sales register to <code>.xlsx</code> or <code>.csv</code>.</li>
+          <li>Download GSTR-2A, GSTR-2B and GSTR-1 files from the GST portal, then upload each in <strong>Import files</strong>.</li>
+          <li>Upload the Tally purchase register as <strong>Books - Purchase Register</strong> and the sales register as <strong>Books - Sales Register</strong>.</li>
+          <li>Review and correct the column mapping before importing.</li>
+          <li>Open <strong>Invoice reconciliation</strong>, choose a comparison, and run it.</li>
+          <li>Export the result to Excel and review exceptions before taking any ITC, tax, or filing decision.</li>
+          <li>In <strong>GSTR-3B summary</strong>, enter the portal and books totals and export the comparison.</li>
+          <li>Use the same GSTIN and period for all related files. Period format is MMYYYY, e.g. September 2026 = 092026.</li>
+        </ol>
+        <h2>Important limitations</h2>
+        <ul>
+          <li>It does not connect to a GSP or download returns automatically.</li>
+          <li>Portal export formats vary. Column mapping must be checked; complex multi-sheet or JSON exports may need format-specific handling.</li>
+          <li>GSTR-3B is summary-level and is compared by totals, not by invoice number.</li>
+          <li>Matching uses invoice number + party GSTIN. Credit/debit notes, amendments, reverse-charge cases, ISD, imports, duplicate invoice numbers and credit notes need more specialised logic.</li>
+          <li>A match in this report does not itself establish ITC eligibility or legal compliance. Verify exceptions against the original documents and current rules.</li>
+          <li>Data is stored unencrypted in this browser profile. Use a trusted device, and clear local data when you are done if the machine is shared.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="footer">
+  Browser edition &middot; all processing happens on this device &middot; no GSP credentials are stored
+</footer>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
